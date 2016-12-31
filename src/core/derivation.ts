@@ -135,29 +135,18 @@ export function trackDerivedFunction<T>(derivation: IDerivation, f: () => T) {
 }
 
 export function handleExceptionInDerivation(derivation: IDerivation) {
-	const message = (
-		`[mobx] An uncaught exception occurred while calculating your computed value, autorun or transformer. Or inside the render() method of an observer based React component. ` +
-		`These functions should never throw exceptions as MobX will not always be able to recover from them. ` +
-		`Please fix the error reported after this message or enable 'Pause on (caught) exceptions' in your debugger to find the root cause. In: '${derivation.name}'. ` +
-		`For more details see https://github.com/mobxjs/mobx/issues/462`
-	);
-	if (isSpyEnabled()) {
-		spyReport({
-			type: "error",
-			message
-		});
-	}
-	console.warn(message); // In next major, maybe don't emit this message at all?
-	// Poor mans recovery attempt
-	// Assumption here is that this is the only exception handler in MobX.
-	// So functions higher up in the stack (like transanction) won't be modifying the globalState anymore after this call.
-	// (Except for other trackDerivedFunction calls of course, but that is just)
-	changeDependenciesStateTo0(derivation);
+	// reset derivation tracking, this resets to the original derivation list
+	// this might cause the exception to be triggered again, but also allows it to be recovered from
+	// by changing the state into something that can be handled by the derivation..
 	derivation.newObserving = null;
 	derivation.unboundDepsCount = 0;
+	// reset relevant internal fields in the derivation
 	derivation.recoverFromError();
 	// close current batch, make sure pending unobservations are executed
 	endBatch();
+	// Assumption here is that this is the only exception handler in MobX.
+	// So functions higher up in the stack (like transanction) won't be modifying the globalState anymore after this call.
+	// (Except for other trackDerivedFunction calls of course, but that is correct and handle this fine)
 	resetGlobalState();
 }
 

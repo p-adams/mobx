@@ -105,6 +105,16 @@ Using `computed` to create boxed observables has been simplified, and `computed`
 * `computed(expr, setter)`
 * `computed(expr, options)`, where options is an object that can specify one or more of the following fields: `name`, `setter`, `compareStructural` or `context` (the "this").
 
+### `reaction` api has been simplified
+
+The signature of `reaction` is now `reaction(dataFunc, effectFunc, options?)`, where the following options are accepted:
+
+* `context`: The `this` to be used in the functions
+* `fireImmediately`
+* `delay`: Number in milliseconds that can be used to debounce the effect function.
+* `compareStructural`: `false` by default. If `true`, the return value of the *data* function is structurally compared to it's previous return value, and the *effect* function will only be invoked if there is a structural change in the output.
+* `name`: String
+
 ### Bound actions
 
 It is now possible to create actions and bind them in one go using `action.bound`. See [#699](https://github.com/mobxjs/mobx/issues/699).
@@ -140,6 +150,16 @@ If you still want to use the old behavior, this can be achieved by running `mobx
 Since this behavior is probably not used outside Mendix, it has been deprecated immediately, so if you rely on this feature, please report in #621, so that it can be undeprecated if there is no more elegant solution.
 
 See [#621](https://github.com/mobxjs/mobx/issues/621)
+
+### Removed error handling, improved error recovery
+
+MobX always printed a warning when an exception was thrown from a computed value, reaction or react component: `[mobx] An uncaught exception occurred while calculating....`.
+This warning was often confusing for people because they either had the impression that this was a mobx exception, while it actually is just informing about an exception that happened in userland code.
+And sometimes, the actual exception was silently caught somewhere else.
+MobX now does not print any warnings anymore, and just makes sure it's internal state is still stable.
+Not throwing or handling an exception is now entirely the responsibility of the user.
+
+Throwing an exception doesn't revert the causing mutation, but it does reset tracking information, which makes it possible to recover from exceptions by changing the state in such a way that a next run of the derivation doesn't throw.
 
 ### Flow-Types Support 🎉🎉🎉
 

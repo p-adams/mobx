@@ -47,6 +47,87 @@ test('exception1', function(t) {
     t.end();
 })
 
+test('exceptions in computed values can be recovered from', t => {
+	var a = observable({
+		x: 1,
+		get y() {
+			if (this.x === 2)
+				throw "Uhoh"
+			return this.x * 2
+		}
+	})
+
+	t.equal(a.y, 2)
+	a.x = 2
+
+	t.throws(() => a.y, /Uhoh/)
+
+	checkGlobalState(t)
+
+	a.x = 3
+	t.equal(a.y, 6)
+	checkGlobalState(t)
+	t.end()
+})
+
+test('exception when starting autorun cannot be recovered from', t => {
+	var b = undefined
+	var a = observable({
+		x: 2,
+		get y() {
+			if (this.x === 2)
+				throw "Uhoh"
+			return this.x * 2
+		}
+	})
+
+	t.throws(() => {
+		mobx.autorun(() => { b = a.y })
+	}, /Uhoh/)
+	t.equal(b, undefined)
+	checkGlobalState(t)
+	a.x = 3
+	t.equal(b, undefined) // tracking never started..
+	checkGlobalState(t)
+	t.equal(mobx.extras.getAtom(a, "y").observers.length, 0)
+	t.end()
+})
+
+test('exception in autorun can be recovered from', t => {
+	var b = undefined
+	var a = observable({
+		x: 1,
+		get y() {
+			if (this.x === 2)
+				throw "Uhoh"
+			return this.x * 2
+		}
+	})
+
+	var d = mobx.autorun(() => { b = a.y })
+	t.equal(a.y, 2)
+	t.equal(b, 2)
+	t.equal(mobx.extras.getAtom(a, "y").observers.length, 1)
+
+	t.throws(() => {
+		a.x = 2
+	}, /Uhoh/)
+	t.equal(a.y, 2) // old cached value!
+	t.equal(mobx.extras.getAtom(a, "y").observers.length, 1)
+
+	t.equal(b, 2)
+	checkGlobalState(t)
+
+	a.x = 3
+	t.equal(a.y, 6)
+	t.equal(b, 6)
+	checkGlobalState(t)
+	t.equal(mobx.extras.getAtom(a, "y").observers.length, 1)
+	d()
+	t.equal(mobx.extras.getAtom(a, "y").observers.length, 0)
+	t.end()
+})
+
 test('deny state changes in views', function(t) {
     var x = observable(3);
     var z = observable(5);
@@ -290,7 +371,7 @@ test('error handling assistence ', function(t) {
 
         t.deepEqual(values, [6, 4, 14, 8]);
         t.equal(errors.length, 0);
-		t.equal(warns.length, 2);
+		t.equal(warns.length, 0); // since mobx 3 no warnings are printed anymore
         t.equal(thrown.length, 2);
 
         console.error = baseError;
@@ -370,7 +451,7 @@ test('peeking inside erroring computed value doesn\'t bork (global) state', t =>
 	t.equal(a.hasUnreportedChange, false)
 	t.equal(a.value, 1)
 
-	t.equal(b.dependenciesState, 0)
+	t.equal(b.dependenciesState, -1)
 	t.equal(b.observing.length, 0)
 	t.equal(b.newObserving, null)
 	t.equal(b.isPendingUnobservation, false)
