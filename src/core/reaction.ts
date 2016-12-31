@@ -184,8 +184,21 @@ function runReactionsHelper() {
 				+ ` Probably there is a cycle in the reactive function: ${allReactions[0]}`);
 		}
 		let remainingReactions = allReactions.splice(0);
-		for (let i = 0, l = remainingReactions.length; i < l; i++)
-			remainingReactions[i].runReaction();
+		for (let i = 0, l = remainingReactions.length; i < l; i++) {
+			let hasError = true;
+			try {
+				remainingReactions[i].runReaction();
+				hasError = false;
+			} finally {
+				if (hasError) {
+					// Save all not-yet-run reactions
+					globalState.pendingReactions.push(...remainingReactions.slice(i + 1));
+					// This fancy recursive construction makes sure all other reactions that still can be run are run,
+					// before throwing the current exception (without losing the stack)
+					runReactionsHelper();
+				}
+			}
+		}
 	}
 	globalState.isRunningReactions = false;
 }

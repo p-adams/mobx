@@ -128,6 +128,34 @@ test('exception in autorun can be recovered from', t => {
 	t.end()
 })
 
+test('multiple autoruns with exceptions are handled correctly', t => {
+	var a = mobx.observable(1)
+	var values = []
+	var d1 = mobx.autorun(() => values.push("a" + a.get()))
+	var d2 = mobx.autorun(() => {
+		if (a.get() === 2)
+			throw /Uhoh/
+		values.push("b" + a.get())
+	})
+	var d3 = mobx.autorun(() => values.push("c" + a.get()))
+
+	t.deepEqual(values, ["a1", "b1", "c1"])
+	values.splice(0)
+
+	t.throws(() => a.set(2), /Uhoh/)
+	checkGlobalState(t)
+
+	t.deepEqual(values.sort(), ["a2", "c2"]) // order is irrelevant
+	values.splice(0)
+
+	a.set(3)
+	t.deepEqual(values.sort(), ["a3", "b3", "c3"]) // order is irrelevant
+
+	checkGlobalState(t)
+	d1(); d2(); d3()
+	t.end()
+})
+
 test('deny state changes in views', function(t) {
     var x = observable(3);
     var z = observable(5);
